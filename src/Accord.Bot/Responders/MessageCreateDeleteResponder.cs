@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Accord.Bot.Helpers;
 using Accord.Services;
 using Accord.Services.Spam;
 using Accord.Services.UserMessages;
@@ -14,8 +13,7 @@ namespace Accord.Bot.Responders;
 
 public class MessageCreateDeleteResponder(
     CoreEventQueue eventQueue,
-    SpamEventQueue spamEventQueue,
-    PermissionUserFactory permissionUserFactory)
+    SpamEventQueue spamEventQueue)
     : IResponder<IMessageCreate>,
         IResponder<IMessageUpdate>,
         IResponder<IMessageDelete>,
@@ -43,13 +41,11 @@ public class MessageCreateDeleteResponder(
             gatewayEvent.Attachments.Select(x => x.Filename).ToList(),
             gatewayEvent.Timestamp));
 
-        var permissionUser = await permissionUserFactory.FromId(gatewayEvent.Author.ID.Value);
-
         await spamEventQueue.Queue(new AddSpamCheckMessageRequest(
             gatewayEvent.ID.Value,
             gatewayEvent.ChannelID.Value,
             gatewayEvent.Content,
-            permissionUser));
+            gatewayEvent.Author.ID.Value));
 
         return Result.FromSuccess();
     }

@@ -14,8 +14,14 @@ namespace Accord.Bot.Helpers;
 public class PermissionUserFactory(IDiscordRestGuildAPI guildApi,
     DiscordCache discordCache,
     DiscordConfiguration discordConfiguration,
-    IAppCache appCache)
+    IAppCache appCache) : IPermissionUserProvider
 {
+    public Task<PermissionUser> GetPermissionUser(ulong discordUserId, System.Threading.CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return FromId(discordUserId);
+    }
+
     public async Task<PermissionUser> FromId(ulong discordUserId)
     {
         return await appCache.GetOrAddAsync(

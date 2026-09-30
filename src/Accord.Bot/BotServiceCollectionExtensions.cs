@@ -1,7 +1,9 @@
 using Accord.Bot.Autocomplete;
 using Accord.Bot.CommandGroups;
 using Accord.Bot.Infrastructure;
+using Accord.Bot.Helpers;
 using Accord.Bot.Responders;
+using Accord.Services.Permissions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Remora.Commands.Extensions;
@@ -65,6 +67,8 @@ public static class BotServiceCollectionExtensions
             .WithCommandGroup<ChangelogCommandGroup>()
             .WithCommandGroup<HelpForumCommandGroup>()
             .WithCommandGroup<RssCommandGroup>();
+
+        services.AddScoped<IPermissionUserProvider, PermissionUserFactory>();
 
         services
             .AddResponder<ChannelUpdateResponder>()
