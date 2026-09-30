@@ -10,7 +10,6 @@ using Remora.Rest.Core;
 
 namespace Accord.Bot.Helpers;
 
-[RegisterScoped]
 public class PermissionUserFactory(IDiscordRestGuildAPI guildApi,
     DiscordCache discordCache,
     DiscordConfiguration discordConfiguration,

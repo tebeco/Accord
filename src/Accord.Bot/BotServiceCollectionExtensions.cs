@@ -68,7 +68,9 @@ public static class BotServiceCollectionExtensions
             .WithCommandGroup<HelpForumCommandGroup>()
             .WithCommandGroup<RssCommandGroup>();
 
-        services.AddScoped<IPermissionUserProvider, PermissionUserFactory>();
+        services
+            .AddScoped<IPermissionUserProvider, PermissionUserFactory>()
+            .AddScoped<PermissionUserFactory>();
 
         services
             .AddResponder<ChannelUpdateResponder>()
