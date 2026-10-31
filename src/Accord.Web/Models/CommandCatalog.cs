@@ -225,6 +225,42 @@ public static class CommandCatalog
                     },
                 ]
             },
+            new CommandGroup("AI Subscriptions",
+                "Free Trial of Thought: 5 quotes/day. Load-Bearing Plus: 20, permanently coming soon. " +
+                "Unnecessarily Pro: 100, imaginary billing unavailable. Only the free plan can be used. " +
+                "Allowances reset at midnight UTC. Users start with no banked resets; administrators can grant them for manual quota refills. " +
+                "Subscriptions, usage, and banked resets are in memory and disappear on restart. No payments or actual AI.")
+            {
+                Commands =
+                [
+                    new Command("/ai", "Get a random AI pushback quote; first use enrolls you automatically. Five successful quotes per day, shared with !ai, then a public exhaustion message.", false, false, false),
+                    new Command("!ai", "Get a random AI pushback quote using the same subscription, daily quota, and thinking delay as /ai", false, false, false),
+                    new Command("/ai-subscription usage", "Show your or another user's plan, used and remaining quotes, banked resets, and next UTC reset in this server without enrolling them", false, false, false)
+                    {
+                        Parameters =
+                        [
+                            new Param("user", "IUser", "User to look up (optional, defaults to yourself)", true, false)
+                        ]
+                    },
+                    new Command("/ai-subscription use-reset", "Spend one banked reset to restore your exhausted daily quota for /ai and !ai", false, false, false),
+                    new Command("/ai-subscription grant-reset", "Grant an enrolled user one banked reset in this server without resetting daily usage", true, false, false)
+                    {
+                        Parameters =
+                        [
+                            new Param("user", "IUser", "User who should receive one banked AI reset", false, false)
+                        ]
+                    },
+                    new Command("/ai-subscription reset", "Reset a user's daily usage in this server for both /ai and !ai, preserving their plan and banked resets", true, false, false)
+                    {
+                        Parameters =
+                        [
+                            new Param("user", "IUser", "User whose daily AI quota should be reset", false, false)
+                        ]
+                    },
+                    new Command("/ai-subscription plans", "Browse plans and their unavailable upgrades", false, false, false),
+                    new Command("/ai-subscription upgrade", "Receive a joke rejection from billing; changes nothing", false, false, false),
+                ]
+            },
             new CommandGroup("Utilities",
                 "C# evaluation, code compilation, URL shortening, and bot configuration.")
             {
