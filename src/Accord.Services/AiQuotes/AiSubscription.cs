@@ -7,13 +7,14 @@ public sealed record AiPlan(string Name, int DailyQuotes, string Availability);
 
 public static class AiPlans
 {
-    public static AiPlan Free { get; } = new("Free Trial of Thought", 5, "Automatically assigned");
+    public static AiPlan Free { get; } = new("Free Trial of Being Absolutely Right", 5,
+        "Automatically assigned on your first quote. Your intuition is sound; your daily allowance is five.");
 
     public static IReadOnlyList<AiPlan> All { get; } = Array.AsReadOnly<AiPlan>(
     [
         Free,
-        new AiPlan("Load-Bearing Plus", 20, "Permanently coming soon"),
-        new AiPlan("Unnecessarily Pro", 100, "Billing department unavailable")
+        new AiPlan("Load-Bearing Plus", 20, "Permanently coming soon. The promise is load-bearing; the availability is hypothetical."),
+        new AiPlan("It Depends Pro Max", 100, "Unavailable. Our imaginary billing department is still unpacking what billing means.")
     ]);
 }
 

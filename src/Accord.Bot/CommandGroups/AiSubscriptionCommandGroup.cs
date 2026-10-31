@@ -6,9 +6,7 @@ using Accord.Services.AiQuotes;
 using MediatR;
 using Remora.Commands.Attributes;
 using Remora.Discord.API.Abstractions.Objects;
-using Remora.Discord.Commands.Conditions;
 using Remora.Discord.Commands.Contexts;
-using Remora.Discord.Commands.Feedback.Services;
 using Remora.Results;
 
 namespace Accord.Bot.CommandGroups;
@@ -17,10 +15,10 @@ namespace Accord.Bot.CommandGroups;
 public class AiSubscriptionCommandGroup(
     ICommandContext commandContext,
     IMediator mediator,
-    FeedbackService feedbackService) : AccordCommandGroup
+    AiReplySender replySender) : AccordCommandGroup
 {
-    [Command("usage"), Description("Inspect your or another user's subscription and daily nuance allowance")]
-    public async Task<IResult> Usage([Description("User to look up (defaults to yourself)")] IUser? user = null)
+    [Command("usage"), Description("Audit your or another user's remaining capacity to be absolutely right")]
+    public async Task<IResult> Usage([Description("Whose nuance to audit; defaults to your own load-bearing self")] IUser? user = null)
     {
         var caller = commandContext.GetCommandProxy();
         var userId = user?.ID ?? caller.UserId;
@@ -28,94 +26,133 @@ public class AiSubscriptionCommandGroup(
         var response = await mediator.Send(new GetAiUsageRequest(caller.GuildId.Value, userId.Value), CancellationToken);
         if (response.Subscription is not { } subscription)
         {
-            return await feedbackService.SendContextualAsync(
-                isSelf
-                    ? "Your thoughts are currently unsubscribed. Use `/ai` to start your Free Trial of Thought."
-                    : $"User `{userId.Value}` has no AI subscription in this server yet. They must use `/ai` or `!ai` first.",
-                ct: CancellationToken);
+            var nextStep = isSelf
+                ? $"Use `/ai` or `!ai` to start **{AiPlans.Free.Name}**."
+                : "They can use `/ai` or `!ai` to start their free plan.";
+            return await replySender.SendSubscriptionAsync($"**No active subscription**\n{nextStep}", CancellationToken, user);
         }
 
-        var resetHint = isSelf
-            ? "Use `/ai-subscription use-reset` when your daily quota is exhausted."
-            : "They can use `/ai-subscription use-reset` when their daily quota is exhausted.";
+        const int barWidth = 5;
+        var filledSegments = subscription.SuccessfulQuotes * barWidth / subscription.Plan.DailyQuotes;
+        var progressBar = new string('█', filledSegments) + new string('░', barWidth - filledSegments);
 
-        return await feedbackService.SendContextualAsync(
-            $"AI usage for user `{userId.Value}`\n" +
-            $"**{subscription.Plan.Name}**\n" +
-            $"Daily quotes used: **{subscription.SuccessfulQuotes}/{subscription.Plan.DailyQuotes}**\n" +
-            $"Remaining nuance: **{subscription.RemainingQuotes}**\n" +
-            $"Banked resets: **{subscription.BankedResets}**\n" +
-            $"{resetHint}\n" +
-            $"Resets: **{subscription.ResetsAt:yyyy-MM-dd HH:mm} UTC**", ct: CancellationToken);
+        var usageDescription = $"""
+            **AI subscription usage**
+            *{subscription.Plan.Name}*
+
+            **Daily quotes**
+            `{progressBar}` **{subscription.SuccessfulQuotes}/{subscription.Plan.DailyQuotes}** used · **{subscription.RemainingQuotes}** left
+            Resets {subscription.ResetsAt.ToTimeMarkdown(TimeToMentionType.RelativeTime)} ({subscription.ResetsAt.ToTimeMarkdown()})
+
+            **Banked resets** · **{subscription.BankedResets}**
+            """;
+        return await replySender.SendSubscriptionAsync(usageDescription, CancellationToken, user);
     }
 
-    [Command("reset"), Description("Reset a user's daily AI quota in this server")]
-    [RequireDiscordPermission(DiscordPermission.Administrator)]
-    public async Task<IResult> Reset([Description("User whose daily AI quota should be reset")] IUser user)
+    [Command("reset"), Description("Reset a user's daily quota; reframe exhaustion as available nuance")]
+    public async Task<IResult> Reset([Description("Whose daily quota needs a fresh framework; defaults to yourself")] IUser? user = null)
     {
         var caller = commandContext.GetCommandProxy();
-        var response = await mediator.Send(new ResetAiUsageRequest(caller.GuildId.Value, user.ID.Value), CancellationToken);
+        var userId = user?.ID ?? caller.UserId;
+        var isSelf = userId == caller.UserId;
+        var response = await mediator.Send(new ResetAiUsageRequest(caller.GuildId.Value, userId.Value), CancellationToken);
         if (response.Subscription is not { } subscription)
         {
-            return await feedbackService.SendContextualAsync(
-                $"User `{user.ID.Value}` has no AI subscription in this server yet. There is no nuance to restore.", ct: CancellationToken);
+            var nextStep = isSelf
+                ? "Use `/ai` or `!ai` to start your free plan."
+                : "They can use `/ai` or `!ai` to start their free plan.";
+            return await replySender.SendSubscriptionAsync($"**No active subscription**\n{nextStep}", CancellationToken, user);
         }
 
-        return await feedbackService.SendContextualAsync(
-            $"Daily AI usage reset for user `{user.ID.Value}`. " +
-            $"**{subscription.RemainingQuotes}/{subscription.Plan.DailyQuotes}** quotes available on **{subscription.Plan.Name}**. " +
-            "Their capacity for nuance has been restored.", ct: CancellationToken);
+        var heading = isSelf ? "Your daily quota was reset" : "Their daily quota was reset";
+        var description = $"""
+            **{heading}**
+            *{subscription.Plan.Name}*
+
+            **{subscription.RemainingQuotes}/{subscription.Plan.DailyQuotes}** quotes available
+            **Banked resets** · **{subscription.BankedResets}**
+            """;
+        return await replySender.SendSubscriptionAsync(description, CancellationToken, user);
     }
 
-    [Command("use-reset"), Description("Spend one banked reset to restore your exhausted daily AI quota")]
+    [Command("use-reset"), Description("Spend one banked reset on an exhausted daily quota; operationalize your optionality")]
     public async Task<IResult> UseReset()
     {
         var caller = commandContext.GetCommandProxy();
         var response = await mediator.Send(new UseBankedAiResetRequest(caller.GuildId.Value, caller.UserId.Value), CancellationToken);
-        var message = response.Outcome switch
+        var description = (response.Outcome, response.Subscription) switch
         {
-            BankedAiResetOutcome.NotEnrolled => "Your thoughts are currently unsubscribed. Use `/ai` to start your Free Trial of Thought.",
-            BankedAiResetOutcome.QuotaAvailable =>
-                $"You still have **{response.Subscription!.RemainingQuotes}** quotes available. No banked reset was spent. Preserve your emergency nuance.",
-            BankedAiResetOutcome.NoBankedResets =>
-                "Your bank of nuance is empty. Ask an administrator for a banked reset, or wait until midnight UTC.",
-            BankedAiResetOutcome.Used =>
-                $"One banked reset spent. **{response.Subscription!.RemainingQuotes}** quotes restored; **{response.Subscription.BankedResets}** banked resets remain. " +
-                "Use `/ai` or `!ai` to resume being absolutely right.",
-            _ => "Your banked reset could not be used. Please try again."
+            (BankedAiResetOutcome.Used, { } subscription) => $"""
+                **One banked reset spent**
+
+                **{subscription.RemainingQuotes}/{subscription.Plan.DailyQuotes}** quotes available
+                **Banked resets** · **{subscription.BankedResets}**
+                Next daily reset {subscription.ResetsAt.ToTimeMarkdown(TimeToMentionType.RelativeTime)} ({subscription.ResetsAt.ToTimeMarkdown()})
+
+                Use `/ai` or `!ai` to get another quote.
+                """,
+            (BankedAiResetOutcome.QuotaAvailable, { } subscription) => $"""
+                **You still have quotes left**
+
+                **{subscription.RemainingQuotes}/{subscription.Plan.DailyQuotes}** quotes available
+                **Banked resets** · **{subscription.BankedResets}**
+
+                You can spend a banked reset once you run out of quotes.
+                """,
+            (BankedAiResetOutcome.NoBankedResets, { } subscription) => $"""
+                **No banked resets available**
+
+                Your daily quota refills {subscription.ResetsAt.ToTimeMarkdown(TimeToMentionType.RelativeTime)} ({subscription.ResetsAt.ToTimeMarkdown()}).
+
+                • Refill now with `/ai-subscription reset`.
+                • Bank a reset with `/ai-subscription grant-reset`. You can grant one to yourself or ask someone to grant you one.
+                """,
+            (BankedAiResetOutcome.NotEnrolled, _) => $"**No active subscription**\nUse `/ai` or `!ai` to start **{AiPlans.Free.Name}**.",
+            _ => "**Couldn’t use a banked reset**\nPlease try again."
         };
-        return await feedbackService.SendContextualAsync(message, ct: CancellationToken);
+        return await replySender.SendSubscriptionAsync(description, CancellationToken);
     }
 
-    [Command("grant-reset"), Description("Grant a user one banked AI reset in this server")]
-    [RequireDiscordPermission(DiscordPermission.Administrator)]
-    public async Task<IResult> GrantReset([Description("User who should receive one banked AI reset")] IUser user)
+    [Command("grant-reset"), Description("Grant a user one banked reset; fund their emergency reserve of caveats")]
+    public async Task<IResult> GrantReset([Description("User receiving one banked reset and a renewed sense of optionality")] IUser user)
     {
         var caller = commandContext.GetCommandProxy();
+        var isSelf = user.ID == caller.UserId;
         var response = await mediator.Send(new GrantBankedAiResetRequest(caller.GuildId.Value, user.ID.Value), CancellationToken);
-        if (response.Outcome == BankedAiResetOutcome.NotEnrolled)
+        if (response.Subscription is not { } subscription)
         {
-            return await feedbackService.SendContextualAsync(
-                $"User `{user.ID.Value}` has no AI subscription in this server yet. They must use `/ai` or `!ai` first.", ct: CancellationToken);
+            var nextStep = isSelf
+                ? "Use `/ai` or `!ai` to enroll before banking a reset."
+                : "They need to use `/ai` or `!ai` before they can receive a reset.";
+            return await replySender.SendSubscriptionAsync($"**No active subscription**\n{nextStep}", CancellationToken, user);
         }
 
-        return await feedbackService.SendContextualAsync(
-            $"Granted one banked reset to user `{user.ID.Value}`. Their emergency nuance reserve now contains **{response.Subscription!.BankedResets}** resets. " +
-            "Daily usage has not been reset.", ct: CancellationToken);
+        var resetHint = isSelf
+            ? "Use `/ai-subscription use-reset` when you run out of quotes."
+            : "They can use `/ai-subscription use-reset` when they run out of quotes.";
+        var description = $"""
+            **One reset added to the bank**
+
+            **Banked resets** · **{subscription.BankedResets}**
+            **Daily quotes left** · **{subscription.RemainingQuotes}**
+
+            {resetHint}
+            """;
+        return await replySender.SendSubscriptionAsync(description, CancellationToken, user);
     }
 
-    [Command("plans"), Description("Browse plans with increasingly load-bearing promises")]
+    [Command("plans"), Description("Browse quote quotas and increasingly theoretical access to more nuance")]
     public async Task<IResult> Plans()
     {
         var response = await mediator.Send(new GetAiPlansRequest(), CancellationToken);
         var plans = string.Join("\n\n", response.Plans.Select(plan =>
-            $"**{plan.Name}** — {plan.DailyQuotes} quotes/day\n{plan.Availability}"));
-        return await feedbackService.SendContextualAsync(
-            $"{plans}", ct: CancellationToken);
+            $"**{plan.Name}**\n*{plan.DailyQuotes} quotes per day*\n{plan.Availability}"));
+        return await replySender.SendSubscriptionAsync(plans, CancellationToken);
     }
 
-    [Command("upgrade"), Description("Consult our permanently unavailable billing department")]
+    [Command("upgrade"), Description("Request an upgrade and receive a carefully qualified refusal from imaginary billing")]
     public async Task<IResult> Upgrade()
-        => await feedbackService.SendContextualAsync(
-            "Our billing department is on leave. Your ambition has been recorded in volatile memory.", ct: CancellationToken);
+        => await replySender.SendSubscriptionAsync(
+            "You're absolutely right to want more. Our imaginary billing department is on leave, so your upgrade has been reframed as an aspiration. " +
+            "No payment, no plan change, no extra quota. Your ambition is valid; its implementation remains hypothetical.", ct: CancellationToken);
 }

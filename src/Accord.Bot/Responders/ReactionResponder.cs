@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Accord.Bot.Helpers;
+using Accord.Services;
 using Accord.Services.DemocraticDownVoting;
 using Accord.Services.Helpers;
 using Accord.Services.Starboard;
@@ -33,12 +35,22 @@ public class ReactionResponder(
                 ? $"<a:{emoji.Name}:{emoji.ID.Value}>"
                 : $"<:{emoji.Name}:{emoji.ID.Value}>";
 
-        if ((emojiString.Value is "❌" or "🗑️") && gatewayEvent.MessageAuthorID.HasValue)
+        if (emojiString.Value is "❌" or "🗑️")
         {
-            var selfSnowflake =  await discordCache.GetSelfSnowflake();
-            
-            if (gatewayEvent.MessageAuthorID.HasValue
-                && gatewayEvent.MessageAuthorID.Value == selfSnowflake)
+            var selfSnowflake = await discordCache.GetSelfSnowflake();
+            if (gatewayEvent.MessageAuthorID.HasValue && gatewayEvent.MessageAuthorID.Value != selfSnowflake)
+                return Result.FromSuccess();
+
+            var message = await channelApi.GetChannelMessageAsync(gatewayEvent.ChannelID, gatewayEvent.MessageID, ct);
+            if (message.IsSuccess && message.Entity.Author.ID == selfSnowflake
+                && message.Entity.Embeds.Any(embed => embed.Footer is { HasValue: true, Value.Text: AiEmbedFactory.ReplyFooterText }))
+            {
+                await mediator.Send(new DeleteDiscordMessageRequest(gatewayEvent.MessageID.Value, gatewayEvent.ChannelID.Value), ct);
+                return Result.FromSuccess();
+            }
+
+            if (gatewayEvent.UserID != selfSnowflake
+                && gatewayEvent.MessageAuthorID.HasValue && gatewayEvent.MessageAuthorID.Value == selfSnowflake)
             {
                 var permissionUser = await permissionUserFactory.FromId(gatewayEvent.UserID.Value);
                 await mediator.Publish(new DeleteUserBotMessageRequest(permissionUser, gatewayEvent.MessageID.Value), ct);
