@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,7 +14,7 @@ public enum AiWorkOutcome
 }
 
 public sealed record AiWorkRequest(ulong GuildId, ulong UserId) : IRequest<AiWorkResponse>;
-public sealed record AiWorkResponse(AiWorkOutcome Outcome, int BankedResets = 0);
+public sealed record AiWorkResponse(AiWorkOutcome Outcome, int BankedResets = 0, DateTimeOffset ResetsAt = default);
 public sealed record GetAiUsageRequest(ulong GuildId, ulong UserId) : IRequest<GetAiUsageResponse>;
 public sealed record GetAiUsageResponse(AiSubscription? Subscription);
 public sealed record GetAiPlansRequest : IRequest<GetAiPlansResponse>;

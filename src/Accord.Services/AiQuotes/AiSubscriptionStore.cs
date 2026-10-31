@@ -28,7 +28,7 @@ public class AiSubscriptionStore
 
             if (subscriber.Subscription.RemainingQuotes == 0)
             {
-                return new AiWorkResponse(AiWorkOutcome.Exhausted, subscriber.Subscription.BankedResets);
+                return new AiWorkResponse(AiWorkOutcome.Exhausted, subscriber.Subscription.BankedResets, subscriber.Subscription.ResetsAt);
             }
 
             // Hold this subscriber's gate through delivery so concurrent commands cannot overspend.

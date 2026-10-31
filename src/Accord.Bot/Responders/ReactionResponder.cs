@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Accord.Bot.Helpers;
+using Accord.Services.AiQuotes;
 using Accord.Services.DemocraticDownVoting;
 using Accord.Services.Helpers;
 using Accord.Services.Starboard;
@@ -40,6 +41,10 @@ public class ReactionResponder(
             if (gatewayEvent.MessageAuthorID.HasValue
                 && gatewayEvent.MessageAuthorID.Value == selfSnowflake)
             {
+                if (await mediator.Send(new DeleteAiReplyRequest(gatewayEvent.MessageID.Value,
+                        gatewayEvent.ChannelID.Value, gatewayEvent.UserID.Value), ct))
+                    return Result.FromSuccess();
+
                 var permissionUser = await permissionUserFactory.FromId(gatewayEvent.UserID.Value);
                 await mediator.Publish(new DeleteUserBotMessageRequest(permissionUser, gatewayEvent.MessageID.Value), ct);
             }

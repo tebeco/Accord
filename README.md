@@ -7,6 +7,32 @@
 
 A C# .NET Discord bot with moderation, XP/guild participation and utilities aimed at all users within a guild. This is not a hosted bot, it is intended to be self hosted.
 
+## Fictional AI subscriptions — your correctness has a quota
+
+`/ai` and the existing `!ai` text command return one of 700 hardcoded AI pushback quotes through the same subscription workflow. Your first invocation of either automatically enrolls you in **Free Trial of Being Absolutely Right** for that server. Both commands share your daily allowance; switching between them does not bypass the quota.
+
+| Plan | Daily quotes | Availability |
+|---|---:|---|
+| Free Trial of Being Absolutely Right | 5 | Automatically assigned; your intuition is sound, your allowance is five |
+| Load-Bearing Plus | 20 | Permanently coming soon; the availability is hypothetical |
+| It Depends Pro Max | 100 | Imaginary billing is still unpacking what billing means |
+
+Before delivering a quote, both `/ai` and `!ai` wait a random 0–2.999 seconds. For `/ai`, Discord's thinking indicator sells the illusion. The delay is cancellable and does not apply to quota-exhaustion responses.
+
+Each successfully delivered quote costs one credit. Your fifth quote succeeds; further requests receive a public exhaustion message until midnight UTC or until your usage is reset. Failed or cancelled deliveries consume no credits. Concurrent requests share the same allowance; a delivery crossing midnight is charged to its completion day.
+
+Use `/ai-subscription usage` to see your plan, usage, remaining allowance, and next UTC reset. Pass the optional `user` argument (`/ai-subscription usage user:@someone`, or `!ai-subscription usage @someone`) to see another user's usage in the current server. Looking up usage does not enroll anyone. `/ai-subscription plans` lists the tiers. `/ai-subscription upgrade` always returns a joke rejection and changes nothing. All AI subscription commands reply publicly in the channel, as do quotes and exhaustion messages. Higher plans are display-only and cannot be activated. All AI replies are embeds: anyone can delete an `/ai-subscription` reply with ❌ or 🗑️, while only the invoking user can delete an `/ai` or `!ai` reply (including quota errors). Administrator status does not override this AI reaction policy. Deletion tracking is in memory and only covers replies sent during the current bot process; deleting a reply does not refund quote credits.
+
+Subscriptions and usage live only in process memory, separately for each server and user. Usage rolls over on the next operation after midnight UTC; restarting the process clears everything. Multiple bot processes do not share allowances. This feature performs no database operations and uses no payment service, AI provider, or external AI API key. Other bot features retain their existing dependencies.
+
+Users start with **zero banked resets**. Anyone can grant one, including to themselves, with `/ai-subscription grant-reset user:@someone`, after that user has enrolled through `/ai` or `!ai`. Grants add to the reserve without resetting daily usage. Every `/ai` and `/ai-subscription` command is available to everyone in the server; there is no automatic refill. Permission to dispense nuance is universal.
+
+`/ai-subscription usage` shows the banked balance. Once the daily quota is exhausted, `/ai-subscription use-reset` spends one banked reset and restores the full daily allowance for both `/ai` and `!ai`, without changing the plan or next midnight reset. It does not send a quote automatically. Trying it with quota remaining, no banked resets, or no subscription spends nothing. Midnight restores daily quota for free, so a banked reset is not spent if the day has already rolled over. Concurrent use attempts cannot spend multiple resets for the same exhausted quota.
+
+Banked resets carry across days without expiring, but disappear with subscriptions on process restart. They are scoped to each server and user. The grant and use slash commands reply publicly; text equivalents are `!ai-subscription grant-reset @someone` and `!ai-subscription use-reset`, with the same authorization and accounting rules.
+
+Anyone can run `/ai-subscription reset` to reset their own daily usage immediately for testing, or pass `user:@someone` to reset that user instead. The optional user defaults to the caller for `!ai-subscription reset` too; everyone may reframe their own exhaustion. This does not consume or grant banked resets. The reply is public, the plan stays the same, and both `/ai` and `!ai` receive the restored allowance. Reset waits for any quote currently being delivered to that user before clearing usage. Users without a subscription are left unenrolled. The text equivalent, `!ai-subscription reset @someone`, is also available to everyone.
+
 ## How to self host
 
 You can build from source or host via the published Docker image. An example `docker-compose.yml` is below.
